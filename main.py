@@ -35,7 +35,7 @@ def weight_chunks(list_chunks, dict_tokens, n):
             weight += dict_tokens[token]
         list_weighted.append((weight, chunk))
 
-    list_weighted = sorted(list_weighted, key=itemgetter(0), reverse=True)  # Sort by word, descending
+    list_weighted = sorted(list_weighted, key=itemgetter(0), reverse=True)  # Sort by weight, descending
     
     # Show the n top weighted chunks
     for index, chunk in enumerate(list_weighted[:n]):
