@@ -1,7 +1,5 @@
 import argparse
-from collections import Counter
 import glob
-import itertools
 import numpy as np
 from operator import itemgetter
 import os
@@ -24,33 +22,15 @@ def extract_chunks(list_tokens, length, overlap):
     return list_chunks
 
 
-def weight_chunks(list_chunks, dict_tf, dict_idf, n):
-    """
-    Calculate the weight of each chunk based on the frequency of its tokens. Show the top n chunks
-    :param list_chunks: list of overlapping chunks extracted from the text
-    :param dict_tf: dictionary of tokens and their frequency (TF) in the corpus
-    :param dict_idf: dictionary of tokens and their inverse document frequency (IDF) in the corpus
-    :param n: number of chunks to show
-    :return: none
-    """
-    list_weighted = []
-    weight = 0
-    
-    for chunk in list_chunks:
-        for token in chunk:
-            weight += dict_tf[token]
-        list_weighted.append((weight, chunk))
-
-    list_weighted = sorted(list_weighted, key=itemgetter(0), reverse=True)  # Sort by weight, descending
-    
-    # Show the n top weighted chunks
-    for index, chunk in enumerate(list_weighted[:n]):
-        print('#{} Score: {}'.format(index+1, list_weighted[index][0]))
-        print(list_weighted[index][1])
-        print()
-    
-
 def calculate_tfidf(vectorizer, matrix, idx, chunk):
+    """
+    Calculate TF-IDF for a given chunk as the mean of TF-IDF of every token in the chunk
+    :param vectorizer: model trained on the corpus and used to get the id of every token in the chunk
+    :param matrix: documents (rows) by terms (columns) matrix with TF-IDF values in the cells
+    :param idx: identifier of the document
+    :param chunk: chunk of text from the document to calculate the TF-IDF
+    :return: float value storing the mean TF-IDF of every token in the chunk
+    """
     list_weights = []
     for token in chunk:
         try:
@@ -81,7 +61,6 @@ def main():
                         list_tokens.append(line.split()[0])  # Use the original word
                     else:
                         list_tokens.append(line.split()[1])  # Use the lemma
-            # list_documents.append(' '.join(list(itertools.chain.from_iterable(list_tokens))))
             list_documents.append(list_tokens)
 
     # Create TF-IDF vectorizer
@@ -96,15 +75,12 @@ def main():
             list_weight.append((calculate_tfidf(vectorizer, matrix, idx, chunk), chunk))
         list_weight = sorted(list_weight, key=itemgetter(0), reverse=True)  # Sort by weight, descending
 
-        # Show the n top weighted chunks
+        # Show the top n weighted chunks
         for index, chunk in enumerate(list_weight[:args.number]):
             print('#{} Score: {}'.format(index + 1, list_weight[index][0]))
             print(list_weight[index][1])
             print()
 
-    # dict_tf = Counter(list_tokens)  # Calculate the TF for each token
-    # weight_chunks(list_chunks, dict_tf, dict_idf, args.number)  # Weight the chunks by TF and obtain the top n chunks
-    
 
 if __name__ == '__main__':
     main()
