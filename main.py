@@ -9,6 +9,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 def extract_chunks(list_tokens, length, overlap):
     """
     Given a list of tokens, create chunks of overlapping tokens of 'length' words
+
     :param list_tokens: list containing all the tokens of the text
     :param length: number of words of each chunk
     :param overlap: number of overlapping words between consecutive chunks
@@ -27,6 +28,7 @@ def extract_chunks(list_tokens, length, overlap):
 def calculate_tfidf(vectorizer, matrix, idx, chunk):
     """
     Calculate TF-IDF for a given chunk as the mean of TF-IDF of every token in the chunk
+
     :param vectorizer: model trained on the corpus and used to get the id of every token in the chunk
     :param matrix: documents (rows) by terms (columns) matrix with TF-IDF values in the cells
     :param idx: identifier of the document
@@ -40,6 +42,44 @@ def calculate_tfidf(vectorizer, matrix, idx, chunk):
         except KeyError:
             pass
     return np.array(list_weights).mean()
+
+
+def process_corpus(list_files, list_documents, args, vectorizer, matrix):
+    """
+    Process the corpus and extract the top n chunks for every document based on their TF-IDF
+
+    :param list_files: list of filenames
+    :param list_documents: content of every document as a list of tokens
+    :param args: command line arguments (lenght, overlap and n)
+    :param vectorizer: model that stores TF-IDF for each token in the corpus
+    :param matrix: document x term matrix
+    :return: dictionary where filenames (without path) are keys and list of top n chunks are the values
+    """
+    dict_chunks = {}
+    for idx, list_tokens in enumerate(list_documents):
+        list_weight = []
+        # Stores the list of chunks extracted from the file with length '-l' and overlap '-o'
+        list_chunks = extract_chunks(list_tokens, args.length, args.overlap)
+        for chunk in list_chunks:
+            list_weight.append((calculate_tfidf(vectorizer, matrix, idx, chunk), chunk))
+        list_weight = sorted(list_weight, key=itemgetter(0), reverse=True)  # Sort by weight, descending
+        dict_chunks[os.path.basename(list_files[idx])] = list_weight[:args.number]  # Store the top n chunks
+
+    return dict_chunks
+
+
+def show_chunks(dict_chunks):
+    """
+    Show the top n chunks for each file
+
+    :param dict_chunks: dictionary where keys are filenames and values are the list of top n chunks
+    :return: none
+    """
+    for file in dict_chunks:
+        print('File: ' + file)
+        for index, chunk in enumerate(dict_chunks[file]):
+            print('#{} Score: {}'.format(index + 1, chunk))
+        print()
 
 
 def main():
@@ -69,19 +109,10 @@ def main():
     corpus = [' '.join(list_tokens).strip() for list_tokens in list_documents]  # Join the tokens in a single string for each document
     vectorizer = TfidfVectorizer(lowercase=False)  # Already lowercased
     matrix = vectorizer.fit_transform(corpus)
-    # Extract chunks
-    for idx, list_tokens in enumerate(list_documents):
-        list_weight = []
-        list_chunks = extract_chunks(list_tokens, args.length, args.overlap)  # Stores the list of chunks extracted from the file with length '-l' and overlap '-o'
-        for chunk in list_chunks:
-            list_weight.append((calculate_tfidf(vectorizer, matrix, idx, chunk), chunk))
-        list_weight = sorted(list_weight, key=itemgetter(0), reverse=True)  # Sort by weight, descending
-
-        # Show the top n weighted chunks
-        for index, chunk in enumerate(list_weight[:args.number]):
-            print('#{} Score: {}'.format(index + 1, list_weight[index][0]))
-            print(list_weight[index][1])
-            print()
+    # Process every document and extract the top n chunks
+    dict_chunks = process_corpus(list_files, list_documents, args, vectorizer, matrix)
+    # Show the top n chunks for each file
+    show_chunks(dict_chunks)
 
 
 if __name__ == '__main__':
