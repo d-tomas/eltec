@@ -109,6 +109,7 @@ def main():
     corpus = [' '.join(list_tokens).strip() for list_tokens in list_documents]  # Join the tokens in a single string for each document
     vectorizer = TfidfVectorizer(lowercase=False)  # Already lowercased
     matrix = vectorizer.fit_transform(corpus)
+
     # Process every document and extract the top n chunks
     dict_chunks = process_corpus(list_files, list_documents, args, vectorizer, matrix)
     # Show the top n chunks for each file
