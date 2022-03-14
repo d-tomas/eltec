@@ -16,7 +16,9 @@ def extract_chunks(list_tokens, length, overlap):
     """
     list_chunks = [list_tokens[0:length]]  # Already store the first chunk
 
-    for i in range(length-overlap, len(list_tokens), length-overlap):
+    # The finishing condition of "range" discards the remaining tokens of the text that do not add up to "length"
+    # E.g. With 61,567 tokens and a length of 100 tokens, the last 67 tokens will be discarded
+    for i in range(length-overlap, len(list_tokens)-length, length-overlap):
         list_chunks.append(list_tokens[i:i+length])
 
     return list_chunks
@@ -50,7 +52,7 @@ def main():
     parser.add_argument('-t', '--type', default='lemma', choices=['lemma', 'word'], help='Type of token to use: lemma or original word (lemma by default)')
     args = parser.parse_args()
     
-    list_files = glob.glob(os.path.join(args.folder, '*.csv'))
+    list_files = glob.glob(os.path.join(args.folder, '**/*.csv'), recursive=True)   # Check also subfolders
     list_documents = []  # Stores the content of every document in the corpus as a list of tokens
     for file in list_files:
         with open(file) as input_file:
