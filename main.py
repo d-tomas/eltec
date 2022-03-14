@@ -78,7 +78,7 @@ def show_chunks(dict_chunks):
     for file in dict_chunks:
         print('File: ' + file)
         for index, chunk in enumerate(dict_chunks[file]):
-            print('#{} Score: {}'.format(index + 1, chunk))
+            print('#{} Score: {}'.format(index+1, chunk))
         print()
 
 
