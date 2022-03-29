@@ -3,12 +3,10 @@ import glob
 import numpy as np
 from operator import itemgetter
 import os
-import random
-from sentence_transformers import SentenceTransformer, util
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 
-def extract_passages(list_tokens, length, overlap):
+def extract_chunks(list_tokens, length, overlap):
     """
     Given a list of tokens, create chunks of overlapping tokens of 'length' words
 
@@ -46,49 +44,54 @@ def calculate_tfidf(vectorizer, matrix, idx, chunk):
     return np.array(list_weights).mean()
 
 
-def process_corpus(list_files, list_documents, args, vectorizer, matrix, strategy):
+def process_corpus(list_files, list_documents, args, vectorizer, matrix):
     """
     Process the corpus and extract the top n chunks for every document based on their TF-IDF
 
     :param list_files: list of filenames
     :param list_documents: content of every document as a list of tokens
-    :param args: command line arguments (length, overlap and n)
-    :param strategy: "random" passages or "tfidf"
+    :param args: command line arguments (lenght, overlap and n)
+    :param vectorizer: model that stores TF-IDF for each token in the corpus
+    :param matrix: document x term matrix
     :return: dictionary where filenames (without path) are keys and list of top n chunks are the values
     """
-    dict_passages = {}
+    dict_chunks = {}
     for idx, list_tokens in enumerate(list_documents):
         list_weight = []
         # Stores the list of chunks extracted from the file with length '-l' and overlap '-o'
-        list_passages = extract_passages(list_tokens, args.length, args.overlap)
-        for passage in list_passages:
-            if strategy == 'tfidf':
-                list_weight.append((calculate_tfidf(vectorizer, matrix, idx, passage), passage))
-            else:  # 'random'
-                list_weight.append((0, passage))  # The weight is irrelevant (random selection)
+        list_chunks = extract_chunks(list_tokens, args.length, args.overlap)
+        for chunk in list_chunks:
+            list_weight.append((calculate_tfidf(vectorizer, matrix, idx, chunk), chunk))
+        list_weight = sorted(list_weight, key=itemgetter(0), reverse=True)  # Sort by weight, descending
+        dict_chunks[os.path.basename(list_files[idx])] = list_weight[:args.number]  # Store the top n chunks
 
-        if strategy == 'tfidf':
-            list_weight = sorted(list_weight, key=itemgetter(0), reverse=True)  # Sort by weight, descending
-        else:  # 'random'
-            random.shuffle(list_weight)  # Shuffle the passages
+    return dict_chunks
 
-        dict_passages[os.path.basename(list_files[idx])] = list_weight[:args.number]  # Store the top n chunks
 
-    return dict_passages
+def show_chunks(dict_chunks):
+    """
+    Show the top n chunks for each file
+
+    :param dict_chunks: dictionary where keys are filenames and values are the list of top n chunks
+    :return: none
+    """
+    for file in dict_chunks:
+        print('File: ' + file)
+        for index, chunk in enumerate(dict_chunks[file]):
+            print('#{} Score: {}'.format(index+1, chunk))
+        print()
 
 
 def main():
+    # Command line arguments
     parser = argparse.ArgumentParser(description='Process ELTeC corpus.')
     parser.add_argument('folder', help='Name of the folder that stores the files to be processed')
-    parser.add_argument('-n', '--number', default=10, type=int,
-                        help='Number of passages to retrieve for each file (250 by default)')
-    parser.add_argument('-l', '--length', default=100, type=int, help='Length of each passages (50 words by default)')
-    parser.add_argument('-t', '--type', default='lemma', choices=['lemma', 'word'],
-                        help='Type of token to use: lemma or original word (lemma by default)')
-    parser.add_argument('-s', '--strategy', default='random', choices=['random', 'tfidf'],
-                        help='Type of strategy followed to extract passages: random ("random") or TF-IDF ("tfidf")')
+    parser.add_argument('-n', '--number', default=10, type=int, help='Number of chunks to retrieve for each file (10 by default)')
+    parser.add_argument('-l', '--length', default=100, type=int, help='Length of each chunk (100 words by default)')
+    parser.add_argument('-o', '--overlap',  default=50, type=int, help='Length of overlapping text in consecutive chunks (50 words by default)')
+    parser.add_argument('-t', '--type', default='lemma', choices=['lemma', 'word'], help='Type of token to use: lemma or original word (lemma by default)')
     args = parser.parse_args()
-
+    
     list_files = glob.glob(os.path.join(args.folder, '**/*.csv'), recursive=True)   # Check also subfolders
     list_documents = []  # Stores the content of every document in the corpus as a list of tokens
     for file in list_files:
@@ -102,30 +105,13 @@ def main():
                         list_tokens.append(line.split()[1])  # Use the lemma
             list_documents.append(list_tokens)
 
-    # Join the tokens in a single string for each document
-    corpus = [' '.join(list_tokens).strip() for list_tokens in list_documents]
-
-    if args.strategy == 'tf-idf':
-        # Create TF-IDF vectorizer
-        vectorizer = TfidfVectorizer(lowercase=False)  # Already lowercased
-        matrix = vectorizer.fit_transform(corpus)
-    else:  # 'random'
-        vectorizer = ''
-        matrix = ''
+    # Create TF-IDF vectorizer
+    corpus = [' '.join(list_tokens).strip() for list_tokens in list_documents]  # Join the tokens in a single string for each document
+    vectorizer = TfidfVectorizer(lowercase=False)  # Already lowercased
+    matrix = vectorizer.fit_transform(corpus)
 
     # Process every document and extract the top n chunks
     dict_chunks = process_corpus(list_files, list_documents, args, vectorizer, matrix)
-
-    # Load SentenceBERT model
-    model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-
-
-    # Show the top n chunks for each file
-    show_chunks(dict_chunks)
-
-
-    # Process every document and extract the top n chunks
-    dict_chunks = extract_passages_random(list_files, list_documents, args)
     # Show the top n chunks for each file
     show_chunks(dict_chunks)
 
