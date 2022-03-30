@@ -58,7 +58,7 @@ def process_corpus(dict_documents, args, vectorizer, matrix, strategy):
     """
     dict_passages = {}
     for idx, table_name in enumerate(dict_documents):
-
+        dict_documents[table_name]
 
 
         list_weight = []
