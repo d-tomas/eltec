@@ -1,4 +1,5 @@
 import argparse
+from collections import defaultdict
 import glob
 import numpy as np
 from operator import itemgetter
@@ -46,18 +47,20 @@ def calculate_tfidf(vectorizer, matrix, idx, chunk):
     return np.array(list_weights).mean()
 
 
-def process_corpus(list_files, list_documents, args, vectorizer, matrix, strategy):
+def process_corpus(dict_documents, args, vectorizer, matrix, strategy):
     """
     Process the corpus and extract the top n chunks for every document based on their TF-IDF
 
-    :param list_files: list of filenames
-    :param list_documents: content of every document as a list of tokens
+    :param dict_documents: content of every document as a dictionary of tokens (keys are filenames)
     :param args: command line arguments (length, overlap and n)
     :param strategy: "random" passages or "tfidf"
     :return: dictionary where filenames (without path) are keys and list of top n chunks are the values
     """
     dict_passages = {}
-    for idx, list_tokens in enumerate(list_documents):
+    for idx, table_name in enumerate(dict_documents):
+
+
+
         list_weight = []
         # Stores the list of chunks extracted from the file with length '-l' and overlap '-o'
         list_passages = extract_passages(list_tokens, args.length, args.overlap)
@@ -90,9 +93,12 @@ def main():
     args = parser.parse_args()
 
     list_files = glob.glob(os.path.join(args.folder, '**/*.csv'), recursive=True)   # Check also subfolders
-    list_documents = []  # Stores the content of every document in the corpus as a list of tokens
+    # For each language, store the list of tokens of each document
+    dict_documents = defaultdict(dict)  # Nested dictionary
     for file in list_files:
         with open(file) as input_file:
+            filename = os.path.basename(file).split('.')[0]  # Name of the file used as key to the dictionary
+            language = filename[:3]  # The language is coded in the three first letters of the filename
             list_tokens = []  # Stores the list of tokens in the file
             for line in input_file:
                 if line.split():
@@ -100,15 +106,20 @@ def main():
                         list_tokens.append(line.split()[0])  # Use the original word
                     else:
                         list_tokens.append(line.split()[1])  # Use the lemma
-            list_documents.append(list_tokens)
+            dict_documents[language][filename] = list_tokens
 
-    # Join the tokens in a single string for each document
-    corpus = [' '.join(list_tokens).strip() for list_tokens in list_documents]
+    if True:
+    #if args.strategy == 'tf-idf':
+        # The TF-IDF is calculated for each language independently
+        for language in dict_documents:
+            # Join the tokens in a single string for each document
+            corpus = [' '.join(list_tokens).strip() for list_tokens in dict_documents[language].values()]
+            # Create TF-IDF vectorizer
+            vectorizer = TfidfVectorizer(lowercase=False)  # Already lowercased
+            matrix = vectorizer.fit_transform(corpus)
+            # Process every document and extract the top n chunks
+            dict_documents[language] = process_corpus(dict_documents[language], args, vectorizer, matrix, args.strategy)
 
-    if args.strategy == 'tf-idf':
-        # Create TF-IDF vectorizer
-        vectorizer = TfidfVectorizer(lowercase=False)  # Already lowercased
-        matrix = vectorizer.fit_transform(corpus)
     else:  # 'random'
         vectorizer = ''
         matrix = ''
